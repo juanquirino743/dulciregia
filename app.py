@@ -9,7 +9,7 @@ from reportlab.pdfgen import canvas
 
 # ---------------- CONFIG ----------------
 st.set_page_config(
-    page_title="Sistema Dulciregia v7",
+    page_title="Sistema Dulciregia v8",
     layout="wide",
     page_icon="🍭"
 )
@@ -25,12 +25,6 @@ st.markdown("""
     width:100%;
     height:3em;
 }
-.stMetric {
-    background:#f0faff;
-    padding:15px;
-    border-radius:10px;
-    border-left:5px solid #00AEEF;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -38,20 +32,12 @@ st.markdown("""
 CAT_FILE = "catalogo_dulciregia.csv"
 REG_FILE = "registros_movimientos.csv"
 
-# ---------------- FUNCIONES ----------------
+# ---------------- CATALOGO ----------------
 def get_catalog():
 
     if os.path.exists(CAT_FILE):
 
         df = pd.read_csv(CAT_FILE)
-
-        df.columns = [c.strip() for c in df.columns]
-
-        df.rename(columns={
-            "Descripción":"Producto",
-            "Descripcion":"Producto",
-            "Nombre":"Producto"
-        }, inplace=True)
 
         df["Clave"] = df["Clave"].astype(str)
 
@@ -66,30 +52,24 @@ def get_catalog():
         columns=["Clave","Producto","Precio"]
     )
 
-
+# ---------------- REGISTROS ----------------
 def get_records():
 
     if os.path.exists(REG_FILE):
 
         df = pd.read_csv(REG_FILE)
 
-        df["Fecha"] = pd.to_datetime(
-            df["Fecha"],
-            errors="coerce"
-        )
-
         df["Cantidad"] = pd.to_numeric(
             df["Cantidad"],
             errors="coerce"
         ).fillna(0)
 
-        df["Total"] = pd.to_numeric(
-            df["Total"],
+        df["Precio_Unit"] = pd.to_numeric(
+            df["Precio_Unit"],
             errors="coerce"
         ).fillna(0)
 
-        if "Unidad" not in df.columns:
-            df["Unidad"] = "Pieza"
+        df["Total"] = df["Cantidad"] * df["Precio_Unit"]
 
         return df
 
@@ -106,43 +86,37 @@ def get_records():
         "Observaciones"
     ])
 
-
 # ---------------- PDF ----------------
 def generar_pdf(df, titulo):
 
     buffer = io.BytesIO()
 
-    c = canvas.Canvas(buffer, pagesize=letter)
+    c = canvas.Canvas(
+        buffer,
+        pagesize=letter
+    )
 
-    c.setFont("Helvetica", 16)
-    c.drawString(50, 750, titulo)
+    c.setFont("Helvetica",14)
+    c.drawString(50,750,titulo)
 
-    c.setFont("Helvetica", 10)
+    y=720
 
-    y = 720
-
-    total_dinero = df["Total"].sum()
-
-    c.drawString(50, y, f"Total dinero: ${total_dinero:,.2f}")
-
-    y -= 30
-
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
 
         texto = (
-            f"{row['Fecha'].date()} | "
+            f"{row['Fecha']} | "
             f"{row['Producto']} | "
             f"{row['Cantidad']} {row['Unidad']} | "
-            f"${row['Total']:,.2f}"
+            f"${row['Total']:.2f}"
         )
 
-        c.drawString(50, y, texto)
+        c.drawString(50,y,texto)
 
         y -= 20
 
         if y < 50:
             c.showPage()
-            y = 750
+            y=750
 
     c.save()
 
@@ -150,14 +124,13 @@ def generar_pdf(df, titulo):
 
     return buffer
 
-
 # ---------------- MENU ----------------
 menu = [
     "📊 Dashboard",
     "📝 Nuevo Registro",
     "⚙️ Gestionar Registros",
-    "📦 Catálogo (Ver/Editar)",
-    "📂 Carga/Pegado Masivo"
+    "📦 Catálogo",
+    "📂 Carga Masiva"
 ]
 
 choice = st.sidebar.radio(
@@ -165,12 +138,12 @@ choice = st.sidebar.radio(
     menu
 )
 
-# =========================================================
+# =====================================================
 # NUEVO REGISTRO
-# =========================================================
+# =====================================================
 if choice == "📝 Nuevo Registro":
 
-    st.title("📝 Registro de Movimiento")
+    st.title("Nuevo Registro")
 
     cat = get_catalog()
 
@@ -181,207 +154,97 @@ if choice == "📝 Nuevo Registro":
     else:
 
         cat["Busqueda"] = (
-            cat["Clave"] + " | " + cat["Producto"]
+            cat["Clave"]
+            + " | "
+            + cat["Producto"]
         )
 
-        with st.form("form_registro", clear_on_submit=True):
+        with st.form("form"):
 
-            col1, col2 = st.columns(2)
+            fecha = st.date_input(
+                "Fecha",
+                datetime.now()
+            )
 
-            with col1:
+            colaborador = st.text_input(
+                "Colaborador"
+            )
 
-                fecha = st.date_input(
-                    "Fecha",
-                    datetime.now()
-                )
+            seleccion = st.selectbox(
+                "Producto",
+                cat["Busqueda"]
+            )
 
-                colaborador = st.text_input(
-                    "Colaborador"
-                )
+            tipo = st.selectbox(
+                "Tipo",
+                ["Uso de Insumo","Merma"]
+            )
 
-                seleccion = st.selectbox(
-                    "Producto",
-                    cat["Busqueda"]
-                )
+            unidad = st.selectbox(
+                "Unidad",
+                ["Pieza","Kilogramo"]
+            )
 
-            with col2:
+            cantidad = st.number_input(
+                "Cantidad",
+                min_value=0.01,
+                step=0.01
+            )
 
-                tipo = st.selectbox(
-                    "Tipo",
-                    ["Uso de Insumo","Merma"]
-                )
-
-                unidad = st.selectbox(
-                    "Unidad",
-                    ["Pieza","Kilogramo"]
-                )
-
-                cantidad = st.number_input(
-                    "Cantidad",
-                    min_value=0.01,
-                    step=0.01
-                )
-
-                obs = st.text_area(
-                    "Observaciones"
-                )
+            obs = st.text_input(
+                "Observaciones"
+            )
 
             guardar = st.form_submit_button(
-                "💾 Guardar"
+                "Guardar"
             )
 
             if guardar:
 
-                if colaborador and seleccion:
+                producto = seleccion.split(" | ")[1]
 
-                    producto = seleccion.split(" | ")[1]
+                precio = cat[
+                    cat["Producto"] == producto
+                ]["Precio"].values[0]
 
-                    precio = cat[
-                        cat["Producto"] == producto
-                    ]["Precio"].values[0]
+                total = cantidad * precio
 
-                    hist = get_records()
+                df = get_records()
 
-                    nuevo_id = (
-                        int(hist["ID"].max()) + 1
-                        if not hist.empty else 1
-                    )
+                nuevo_id = (
+                    df["ID"].max()+1
+                    if not df.empty
+                    else 1
+                )
 
-                    nuevo = pd.DataFrame([{
+                nuevo = pd.DataFrame([{
+                    "ID":nuevo_id,
+                    "Fecha":fecha,
+                    "Colaborador":colaborador,
+                    "Producto":producto,
+                    "Tipo":tipo,
+                    "Unidad":unidad,
+                    "Cantidad":cantidad,
+                    "Precio_Unit":precio,
+                    "Total":total,
+                    "Observaciones":obs
+                }])
 
-                        "ID": nuevo_id,
-                        "Fecha": fecha,
-                        "Colaborador": colaborador,
-                        "Producto": producto,
-                        "Tipo": tipo,
-                        "Unidad": unidad,
-                        "Cantidad": cantidad,
-                        "Precio_Unit": precio,
-                        "Total": precio * cantidad,
-                        "Observaciones": obs
+                df = pd.concat([df,nuevo])
 
-                    }])
+                df.to_csv(
+                    REG_FILE,
+                    index=False
+                )
 
-                    pd.concat([
-                        hist,
-                        nuevo
-                    ]).to_csv(
-                        REG_FILE,
-                        index=False
-                    )
+                st.success("Guardado")
 
-                    st.success("Registro guardado")
-
-                    st.rerun()
-
-                else:
-
-                    st.error("Faltan datos")
-
-
-# =========================================================
+# =====================================================
 # DASHBOARD
-# =========================================================
+# =====================================================
 elif choice == "📊 Dashboard":
 
-    st.title("📊 Dashboard")
-
-    df = get_records()
-
-    if df.empty:
-
-        st.info("Sin registros")
-
-    else:
-
-        merma = df[df["Tipo"]=="Merma"]
-
-        insumos = df[df["Tipo"]=="Uso de Insumo"]
-
-        total_merma = merma["Total"].sum()
-        total_insumos = insumos["Total"].sum()
-
-        cantidad_merma = merma["Cantidad"].sum()
-        cantidad_insumos = insumos["Cantidad"].sum()
-
-        c1,c2,c3,c4 = st.columns(4)
-
-        c1.metric(
-            "💸 Dinero perdido en Merma",
-            f"${total_merma:,.2f}"
-        )
-
-        c2.metric(
-            "📉 Cantidad Merma",
-            f"{cantidad_merma:,.2f}"
-        )
-
-        c3.metric(
-            "📦 Dinero en Uso de Insumos",
-            f"${total_insumos:,.2f}"
-        )
-
-        c4.metric(
-            "📦 Cantidad Insumos",
-            f"{cantidad_insumos:,.2f}"
-        )
-
-        # -------- BOTONES PDF --------
-
-        pdf_merma = generar_pdf(
-            merma,
-            "Reporte de Mermas Dulciregia"
-        )
-
-        st.download_button(
-            "📄 Descargar PDF Mermas",
-            pdf_merma,
-            "reporte_mermas.pdf",
-            "application/pdf"
-        )
-
-        pdf_insumos = generar_pdf(
-            insumos,
-            "Reporte de Insumos Dulciregia"
-        )
-
-        st.download_button(
-            "📄 Descargar PDF Insumos",
-            pdf_insumos,
-            "reporte_insumos.pdf",
-            "application/pdf"
-        )
-
-        # -------- GRAFICA --------
-
-        top = (
-            merma.groupby("Producto")["Cantidad"]
-            .sum()
-            .sort_values(ascending=False)
-            .head(10)
-            .reset_index()
-        )
-
-        fig = px.bar(
-            top,
-            x="Cantidad",
-            y="Producto",
-            orientation="h",
-            title="Top 10 Productos con más Merma"
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
-
-
-# =========================================================
-# GESTIONAR REGISTROS
-# =========================================================
-elif choice == "⚙️ Gestionar Registros":
-
-    st.title("⚙️ Gestionar Registros")
+    st.title("Dashboard")
 
     df = get_records()
 
@@ -391,74 +254,97 @@ elif choice == "⚙️ Gestionar Registros":
 
     else:
 
-        st.dataframe(
-            df,
-            use_container_width=True
+        merma = df[df["Tipo"]=="Merma"]
+
+        insumo = df[df["Tipo"]=="Uso de Insumo"]
+
+        c1,c2,c3,c4 = st.columns(4)
+
+        c1.metric(
+            "Dinero Merma",
+            f"${merma['Total'].sum():.2f}"
         )
 
-        borrar = st.number_input(
-            "ID a eliminar",
-            min_value=1
+        c2.metric(
+            "Cantidad Merma",
+            f"{merma['Cantidad'].sum():.2f}"
         )
 
-        if st.button("Eliminar"):
+        c3.metric(
+            "Dinero Insumos",
+            f"${insumo['Total'].sum():.2f}"
+        )
 
-            df = df[df["ID"] != borrar]
+        c4.metric(
+            "Cantidad Insumos",
+            f"{insumo['Cantidad'].sum():.2f}"
+        )
 
-            df.to_csv(
-                REG_FILE,
-                index=False
-            )
+        pdf_merma = generar_pdf(
+            merma,
+            "Reporte Merma"
+        )
 
-            st.success("Eliminado")
+        st.download_button(
+            "Descargar PDF Merma",
+            pdf_merma,
+            "merma.pdf"
+        )
 
-            st.rerun()
+        pdf_insumo = generar_pdf(
+            insumo,
+            "Reporte Insumos"
+        )
 
+        st.download_button(
+            "Descargar PDF Insumos",
+            pdf_insumo,
+            "insumos.pdf"
+        )
 
-# =========================================================
+# =====================================================
+# GESTIONAR
+# =====================================================
+elif choice == "⚙️ Gestionar Registros":
+
+    st.title("Registros")
+
+    df = get_records()
+
+    st.dataframe(df)
+
+# =====================================================
 # CATALOGO
-# =========================================================
-elif choice == "📦 Catálogo (Ver/Editar)":
+# =====================================================
+elif choice == "📦 Catálogo":
 
-    st.title("📦 Catálogo")
+    st.title("Catalogo")
 
     df = get_catalog()
 
-    edit = st.data_editor(
-        df,
-        num_rows="dynamic",
-        use_container_width=True
-    )
+    edit = st.data_editor(df)
 
-    if st.button("Guardar Cambios"):
+    if st.button("Guardar"):
 
         edit.to_csv(
             CAT_FILE,
             index=False
         )
 
-        st.success("Guardado")
-
-        st.rerun()
-
-
-# =========================================================
+# =====================================================
 # CARGA MASIVA
-# =========================================================
-elif choice == "📂 Carga/Pegado Masivo":
+# =====================================================
+elif choice == "📂 Carga Masiva":
 
-    st.title("📂 Carga Masiva")
+    st.title("Carga Masiva")
 
-    txt = st.text_area(
-        "Pega desde Excel",
-        height=200
-    )
+    txt = st.text_area("Pegar Excel")
 
     if st.button("Procesar"):
 
         if txt:
 
-            df = pd.read_csv(
+            nuevo = pd.read_csv(
                 io.StringIO(txt),
                 sep="\t",
                 header=None,
@@ -469,10 +355,25 @@ elif choice == "📂 Carga/Pegado Masivo":
                 ]
             )
 
-            df.to_csv(
+            if os.path.exists(CAT_FILE):
+
+                existente = pd.read_csv(CAT_FILE)
+
+                final = pd.concat([
+                    existente,
+                    nuevo
+                ]).drop_duplicates(
+                    subset="Clave",
+                    keep="last"
+                )
+
+            else:
+
+                final = nuevo
+
+            final.to_csv(
                 CAT_FILE,
                 index=False
             )
 
-            st.success("Catálogo cargado")
-
+            st.success("Actualizado")
