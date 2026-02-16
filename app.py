@@ -4,6 +4,9 @@ import plotly.express as px
 from datetime import datetime
 import os
 import io
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
 
 # ---------------- CONFIG ----------------
 st.set_page_config(
@@ -62,6 +65,32 @@ def get_records():
         "Tipo","Cantidad","Precio_Unit",
         "Total","Observaciones"
     ])
+def generar_pdf(df, titulo):
+
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+
+    c.setFont("Helvetica", 14)
+    c.drawString(50, 750, titulo)
+
+    y = 720
+    c.setFont("Helvetica", 10)
+
+    for index, row in df.iterrows():
+
+        texto = f"{row['Fecha']} | {row['Producto']} | Cantidad: {row['Cantidad']} | Total: ${row['Total']}"
+        c.drawString(50, y, texto)
+
+        y -= 20
+
+        if y < 50:
+            c.showPage()
+            y = 750
+
+    c.save()
+    buffer.seek(0)
+
+    return buffer
 
 # ---------------- MENU ----------------
 menu = [
@@ -270,3 +299,4 @@ elif choice == "📂 Carga/Pegado Masivo":
             df.to_csv(CAT_FILE,index=False)
 
             st.success("Catálogo cargado")
+
