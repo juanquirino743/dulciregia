@@ -187,6 +187,34 @@ elif choice == "📊 Dashboard":
     st.title("📊 Dashboard")
 
     df = get_records()
+df = get_records()
+
+mermas = df[df["Tipo"] == "Merma"]
+
+if not mermas.empty:
+
+    pdf_mermas = generar_pdf(mermas, "Reporte de Mermas - Dulciregia")
+
+    st.download_button(
+        label="📄 Descargar Reporte PDF de Mermas",
+        data=pdf_mermas,
+        file_name="reporte_mermas_dulciregia.pdf",
+        mime="application/pdf"
+    )
+
+
+insumos = df[df["Tipo"] == "Uso de Insumo"]
+
+if not insumos.empty:
+
+    pdf_insumos = generar_pdf(insumos, "Reporte de Uso de Insumos - Dulciregia")
+
+    st.download_button(
+        label="📄 Descargar Reporte PDF de Insumos",
+        data=pdf_insumos,
+        file_name="reporte_insumos_dulciregia.pdf",
+        mime="application/pdf"
+    )
 
     if df.empty:
         st.info("Sin registros")
@@ -299,4 +327,5 @@ elif choice == "📂 Carga/Pegado Masivo":
             df.to_csv(CAT_FILE,index=False)
 
             st.success("Catálogo cargado")
+
 
