@@ -9,7 +9,7 @@ from reportlab.pdfgen import canvas
 
 # ---------------- CONFIG ----------------
 st.set_page_config(
-    page_title="Sistema Dulciregia v6",
+    page_title="Sistema Dulciregia v7",
     layout="wide",
     page_icon="🍭"
 )
@@ -88,6 +88,9 @@ def get_records():
             errors="coerce"
         ).fillna(0)
 
+        if "Unidad" not in df.columns:
+            df["Unidad"] = "Pieza"
+
         return df
 
     return pd.DataFrame(columns=[
@@ -118,13 +121,19 @@ def generar_pdf(df, titulo):
 
     y = 720
 
+    total_dinero = df["Total"].sum()
+
+    c.drawString(50, y, f"Total dinero: ${total_dinero:,.2f}")
+
+    y -= 30
+
     for index, row in df.iterrows():
 
         texto = (
-            f"{row['Fecha']} | "
+            f"{row['Fecha'].date()} | "
             f"{row['Producto']} | "
             f"{row['Cantidad']} {row['Unidad']} | "
-            f"${row['Total']}"
+            f"${row['Total']:,.2f}"
         )
 
         c.drawString(50, y, texto)
@@ -287,23 +296,38 @@ elif choice == "📊 Dashboard":
 
         merma = df[df["Tipo"]=="Merma"]
 
+        insumos = df[df["Tipo"]=="Uso de Insumo"]
+
         total_merma = merma["Total"].sum()
+        total_insumos = insumos["Total"].sum()
 
-        piezas_merma = merma["Cantidad"].sum()
+        cantidad_merma = merma["Cantidad"].sum()
+        cantidad_insumos = insumos["Cantidad"].sum()
 
-        c1,c2 = st.columns(2)
+        c1,c2,c3,c4 = st.columns(4)
 
         c1.metric(
-            "Pérdida Total Merma",
+            "💸 Dinero perdido en Merma",
             f"${total_merma:,.2f}"
         )
 
         c2.metric(
-            "Cantidad Perdida",
-            f"{piezas_merma:,.2f}"
+            "📉 Cantidad Merma",
+            f"{cantidad_merma:,.2f}"
         )
 
-        # -------- PDF MERMAS --------
+        c3.metric(
+            "📦 Dinero en Uso de Insumos",
+            f"${total_insumos:,.2f}"
+        )
+
+        c4.metric(
+            "📦 Cantidad Insumos",
+            f"{cantidad_insumos:,.2f}"
+        )
+
+        # -------- BOTONES PDF --------
+
         pdf_merma = generar_pdf(
             merma,
             "Reporte de Mermas Dulciregia"
@@ -315,9 +339,6 @@ elif choice == "📊 Dashboard":
             "reporte_mermas.pdf",
             "application/pdf"
         )
-
-        # -------- PDF INSUMOS --------
-        insumos = df[df["Tipo"]=="Uso de Insumo"]
 
         pdf_insumos = generar_pdf(
             insumos,
@@ -332,6 +353,7 @@ elif choice == "📊 Dashboard":
         )
 
         # -------- GRAFICA --------
+
         top = (
             merma.groupby("Producto")["Cantidad"]
             .sum()
@@ -355,11 +377,11 @@ elif choice == "📊 Dashboard":
 
 
 # =========================================================
-# GESTIONAR
+# GESTIONAR REGISTROS
 # =========================================================
 elif choice == "⚙️ Gestionar Registros":
 
-    st.title("⚙️ Gestionar")
+    st.title("⚙️ Gestionar Registros")
 
     df = get_records()
 
